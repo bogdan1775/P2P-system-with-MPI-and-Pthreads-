@@ -1,0 +1,63 @@
+Croitoru Constantin Bogdan
+Grupa 334CA
+Tema2 APD
+
+
+In codul meu, intre seed si peer nu fac diferenta, ii tin impreuna intr-un vector de peers, si nu mai trimit mesaj cand a 
+terminat de descarcat fiecare fisier in parte si trimit mesaj la tracker cand a terminat de descarcat toate fisierele pe 
+care trebuia sa le descarce (pe forum s-a zis ca e ok asa).
+
+
+Explicatie cod tracker:
+Acesta are un map dintre numele fisierului si o pereche dintre 2 vectori, unul pentru a retine peers si unul pentru hashuri.
+Logica acestuia este implementata in functia "tracker_func(int numtasks, int rank)". Pentru fiecare proces acesta primeste 
+numele fisierului, numarul de hashuri si hashurile. Daca fisierul se afla deja in map se retine doar rank-ul clientului care 
+a trimis, iar daca nu se gaseste se retin si hashurile fisierului. In momentul in care primeste de la toti, acesta trimite 
+un mesaj tuturor clientilor ca pot incepe sa descarce.
+
+Intr-o bucla while acesta primeste un mesaj. Daca este un mesaj de terminare (clientul a terminat de descarcat toate fisierele 
+de care avea nevoie), cresc numarul de clienti care au terminat de descarcat toate fisierele. Altfel trimit informatiile despre 
+fisierul cerut. Verific daca a mai cerut date despre fisier. Daca a mai cerut ii trimit doar numarul de peers si vectorul cu 
+peers pentru fisierul cerut, altfel ii trimit si numarul de hashuri si hashurile pentru a sti ce sa descarce de la clienti. 
+Totodata daca este prima data cand cer informatii despre fisier il bag si in vectorul de peers al fisierului cerut.
+
+In momentul cand a iesit din bucla, adica cand toti clientii au terminat de descarcat, trimit un mesaj de terminare clientilor.
+
+
+Explicatie cod clienti.
+Fiecare client are un map care retine pentru fiecare fisier lista de hashuri pe care le are.
+Initial fiecare client apeleaza functia "void citire_fisier(int numtasks, int rank)". In aceasta deschide fisierul sau, 
+citeste datele despre fisierele pe care le detine si le retine in mapul "lista_client". Apoi citeste numarul de fisiere dorite 
+si numele acestora. Apoi intra in functia "void transmitere_catre_tracker(int numtasks, int rank)". Pentru fiecare intrare din 
+map-ul "lista_client" transmite catre tracker numele fisierului, numerul de hashuri si hashurile. Apoi asteapta raspuns de la 
+tracker ca poate sa inceapa treaba.
+
+Functia "void *upload_thread_func(void *arg)".
+Aceasta asteapta intr-o bucla while mesaje de la clienti sau tracker. Daca mesajul este de la tracker inseamna ca toti clientii 
+au terminat de descarcat si poate sa se opreasca, iar daca nu e de la tracker inseamna ca este de a un client si primeste hashul.
+Acesta verifica daca are hashul cerut si ii trimite un raspuns, 0 daca nu il are si 1 daca are.
+
+Folosesc un mutex in momentul in care verific daca are hashul in functia "upload_thread_func" si in momentul in care adaug hashul in 
+lista in "download_thread_func". 
+
+
+Functia "void *download_thread_func(void *arg)"
+Acesta pentru fiecare fisier pe care vrea sa il descarce, trimite numele fisierului catre tracker, si primeste numarul de peers, 
+vectorul de peers, numarul de hashuri si hashurile pe care trebuie sa le ceara de la clienti. Apoi intr-o bucla while care tine 
+cat timp numarul de hashuri primite este mai mic decat cel pe care trebuie sa il ceara, trimite hashul unui peer, si asteapta
+raspuns, iar cel la care a cerut ii trimite un raspuns (0 daca nu il are si 1 daca il are). Daca a primit raspuns pozitiv, retine 
+si trece la urmatorul hash. O data la 10 cereri acesta trimite din nou numele fisierului si asteapta numarul de peers si 
+vectorul de peers.
+
+Cand a terminat de cerut toate hashului pentru un fisier, acesta le scrie in fisier, iar cand a descarcat toate fisierele trimite 
+un mesaj trackerului ca a terminat.
+
+
+Logica eficientei este urmatoare.
+Hashurile le cer in ordine, iar pentru clientul de la care sa cer am un index care initial are valoare numarului de peers-1. La 
+fiecare hash cerut scade. Pornesc de la finalul vectorului deoarece la inceput sunt clientii care detin toate hashurile, iar la 
+final cei care au inceput sa le descarce si nu le au complet. Spre exemplu, daca clientul3 incepe sa descarce fisierul7, si 
+incepe si clientul5 sa descarce tot fisierul7, primul segment il ia de la clientul3 care l-a descarcart deja si apoi de la 
+urmatorul si tot asa.(Indexul porneste de la lungimea vectorului-1, scade mereu, iar cand e sub 0, devine iar nr de peers-1).
+
+
